@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A股上市公司智能财务分析系统</title>
+<style>
+:root {
+  --primary: #1a56db;
+  --primary-light: #e8eefb;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --radius: 10px;
+  --transition: 0.2s ease;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; min-height:100vh; }
+.container { max-width:1280px; margin:0 auto; padding:20px 24px; }
+
+/* Header */
+.header { text-align:center; padding:40px 20px 32px; }
+.header h1 { font-size:28px; font-weight:700; color:var(--primary); letter-spacing:-0.5px; }
+.header p { color:var(--text-secondary); margin-top:6px; font-size:14px; }
+
+/* Search */
+.search-wrap { max-width:640px; margin:0 auto 40px; position:relative; }
+.search-box { display:flex; background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; border:2px solid transparent; transition:var(--transition); }
+.search-box:focus-within { border-color:var(--primary); box-shadow:0 0 0 3px rgba(26,86,219,.12); }
+.search-box input { flex:1; border:none; padding:14px 18px; font-size:16px; outline:none; background:transparent; }
+.search-box input::placeholder { color:#94a3b8; }
+.search-box button { background:var(--primary); color:#fff; border:none; padding:14px 28px; font-size:15px; font-weight:600; cursor:pointer; transition:var(--transition); white-space:nowrap; }
+.search-box button:hover { background:#1e40af; }
+.search-box button:disabled { opacity:.6; cursor:not-allowed; }
+
+/* Search dropdown */
+.dropdown { position:absolute; top:100%; left:0; right:0; background:var(--card); border-radius:var(--radius); box-shadow:0 10px 25px rgba(0,0,0,.12); margin-top:6px; z-index:100; display:none; max-height:320px; overflow-y:auto; }
+.dropdown.show { display:block; }
+.dropdown-item { padding:12px 18px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:background .1s; border-bottom:1px solid var(--border); }
+.dropdown-item:last-child { border-bottom:none; }
+.dropdown-item:hover { background:#f8fafc; }
+.dropdown-item .code { color:var(--text-secondary); font-size:13px; font-family:monospace; }
+.dropdown-item .name { font-weight:500; }
+
+/* Loading */
+.loading { text-align:center; padding:40px; display:none; }
+.loading.show { display:block; }
+.spinner { width:44px; height:44px; border:4px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 16px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading p { color:var(--text-secondary); font-size:14px; }
+
+/* Results */
+.results { display:none; }
+.results.show { display:block; }
+
+/* Score card */
+.score-card { background:linear-gradient(135deg, var(--primary), #3b82f6); color:#fff; border-radius:var(--radius); padding:28px 32px; margin-bottom:24px; display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+.score-circle { width:100px; height:100px; border-radius:50%; background:rgba(255,255,255,.15); display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; }
+.score-circle .num { font-size:36px; font-weight:800; line-height:1; }
+.score-circle .label { font-size:12px; opacity:.8; margin-top:2px; }
+.score-info { flex:1; }
+.score-info h2 { font-size:20px; margin-bottom:8px; }
+.score-detail { display:flex; gap:16px; flex-wrap:wrap; }
+.score-detail span { background:rgba(255,255,255,.12); padding:4px 12px; border-radius:20px; font-size:13px; }
+
+/* Info bar */
+.info-bar { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
+.info-tag { background:var(--card); padding:8px 16px; border-radius:20px; font-size:13px; color:var(--text-secondary); box-shadow:var(--shadow); }
+.info-tag b { color:var(--text); }
+
+/* Sections */
+.section { background:var(--card); border-radius:var(--radius); padding:24px 28px; margin-bottom:20px; box-shadow:var(--shadow); }
+.section h3 { font-size:16px; color:var(--primary); margin-bottom:16px; padding-bottom:10px; border-bottom:2px solid var(--primary-light); display:flex; align-items:center; gap:8px; }
+.section h3 .icon { font-size:18px; }
+
+/* Metric grid */
+.metric-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px; }
+.metric-item { padding:12px 16px; border-radius:8px; background:#f8fafc; border:1px solid var(--border); }
+.metric-item .metric-label { font-size:12px; color:var(--text-secondary); margin-bottom:4px; }
+.metric-item .metric-value { font-size:18px; font-weight:700; }
+.metric-item .metric-hint { font-size:11px; color:var(--text-secondary); margin-top:2px; }
+.metric-good { color:var(--success); }
+.metric-warn { color:var(--warning); }
+.metric-bad { color:var(--danger); }
+
+/* Tables */
+.data-table { width:100%; border-collapse:collapse; font-size:13px; }
+.data-table th { background:#f8fafc; padding:10px 14px; text-align:left; font-weight:600; color:var(--text-secondary); border-bottom:2px solid var(--border); white-space:nowrap; }
+.data-table td { padding:10px 14px; border-bottom:1px solid var(--border); }
+.data-table tr:hover { background:#fafafa; }
+.data-table .num { font-family:monospace; text-align:right; }
+
+/* Findings */
+.finding { padding:14px 18px; border-radius:8px; margin-bottom:12px; border-left:4px solid; }
+.finding.risk-high { background:#fef2f2; border-left-color:var(--danger); }
+.finding.risk-medium { background:#fffbeb; border-left-color:var(--warning); }
+.finding.risk-low { background:#f0fdf4; border-left-color:var(--success); }
+.finding.risk-info { background:#eff6ff; border-left-color:var(--primary); }
+.finding .f-title { font-weight:600; font-size:14px; margin-bottom:4px; }
+.finding li { font-size:13px; margin:2px 0 2px 18px; color:var(--text-secondary); }
+
+/* Chart */
+.chart-img { max-width:100%; border-radius:8px; margin:12px 0; box-shadow:var(--shadow); }
+.chart-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width: 768px) { .chart-row { grid-template-columns:1fr; } }
+
+/* Alerts */
+.alert { padding:12px 18px; border-radius:8px; font-size:13px; margin:8px 0; }
+.alert-danger { background:#fef2f2; color:#991b1b; }
+.alert-warning { background:#fffbeb; color:#92400e; }
+.alert-info { background:#eff6ff; color:#1e40af; }
+.alert-success { background:#f0fdf4; color:#065f46; }
+
+/* Badge */
+.badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600; }
+.badge-red { background:#fee2e2; color:#991b1b; }
+.badge-yellow { background:#fef3c7; color:#92400e; }
+.badge-green { background:#d1fae5; color:#065f46; }
+.badge-blue { background:#dbeafe; color:#1e40af; }
+
+/* Tabs */
+.tabs { display:flex; gap:4px; margin-bottom:20px; flex-wrap:wrap; }
+.tab-btn { padding:8px 18px; border:1px solid var(--border); background:var(--card); border-radius:20px; cursor:pointer; font-size:13px; transition:var(--transition); color:var(--text-secondary); }
+.tab-btn:hover { border-color:var(--primary); color:var(--primary); }
+.tab-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+/* Footer */
+.footer { text-align:center; padding:32px; color:var(--text-secondary); font-size:12px; }
+.footer b { color:var(--danger); }
+
+/* Error */
+.error-msg { background:#fef2f2; color:#991b1b; padding:16px; border-radius:var(--radius); text-align:center; display:none; margin-bottom:20px; }
+.error-msg.show { display:block; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>A股上市公司智能财务分析系统</h1>
+    <p>输入公司名称或股票代码，一键生成财务分析报告 — 涵盖财务指标、异常检测、审计分析</p>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="输入股票代码或公司名称，如：600519 / 贵州茅台" autocomplete="off">
+      <button id="searchBtn" onclick="doSearch()">开始分析</button>
+    </div>
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p id="loadingText">正在采集财务数据...</p>
+  </div>
+
+  <div class="results" id="results">
+    <!-- Score Card -->
+    <div class="score-card" id="scoreCard"></div>
+
+    <!-- Info Bar -->
+    <div class="info-bar" id="infoBar"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('indicators')">财务指标</button>
+      <button class="tab-btn" onclick="switchTab('notable')">值得注意的内容</button>
+      <button class="tab-btn" onclick="switchTab('financial')">财务分析</button>
+      <button class="tab-btn" onclick="switchTab('audit')">审计分析</button>
+      <button class="tab-btn" onclick="switchTab('charts')">图表</button>
+    </div>
+
+    <!-- Tab: Indicators -->
+    <div id="tab-indicators" class="tab-content"></div>
+
+    <!-- Tab: Notable -->
+    <div id="tab-notable" class="tab-content" style="display:none;"></div>
+
+    <!-- Tab: Financial Analysis -->
+    <div id="tab-financial" class="tab-content" style="display:none;"></div>
+
+    <!-- Tab: Audit -->
+    <div id="tab-audit" class="tab-content" style="display:none;"></div>
+
+    <!-- Tab: Charts -->
+    <div id="tab-charts" class="tab-content" style="display:none;"></div>
+  </div>
+
+  <div class="footer">
+    <b>免责声明</b>：本系统生成的分析报告仅供研究参考，不构成任何投资建议。数据来源：公开市场数据（AKShare）
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentData = null;
+let searchTimer = null;
+
+// Search input with autocomplete
+document.getElementById('searchInput').addEventListener('input', function(e) {
+  clearTimeout(searchTimer);
+  const val = this.value.trim();
+  if (val.length < 1) {
+    document.getElementById('dropdown').classList.remove('show');
+    return;
+  }
+  searchTimer = setTimeout(() => searchStocks(val), 300);
+});
+
+document.getElementById('searchInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doSearch();
+});
+
+function searchStocks(keyword) {
+  fetch(API + '/api/search', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({keyword})
+  })
+  .then(r => r.json())
+  .then(data => {
+    const dd = document.getElementById('dropdown');
+    if (!data.stocks || data.stocks.length === 0) {
+      dd.classList.remove('show');
+      return;
+    }
+    dd.innerHTML = data.stocks.map(s =>
+      `<div class="dropdown-item" onclick="selectStock('${s.code}','${s.name}')">
+        <span class="name">${s.name || '(未知)'}</span>
+        <span class="code">${s.code}</span>
+      </div>`
+    ).join('');
+    dd.classList.add('show');
+  });
+}
+
+function selectStock(code, name) {
+  document.getElementById('searchInput').value = code + (name ? ' ' + name : '');
+  document.getElementById('dropdown').classList.remove('show');
+  doSearch();
+}
+
+// Close dropdown on click outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-wrap')) {
+    document.getElementById('dropdown').classList.remove('show');
+  }
+});
+
+function doSearch() {
+  const keyword = document.getElementById('searchInput').value.trim();
+  if (!keyword) return;
+
+  document.getElementById('dropdown').classList.remove('show');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('errorMsg').classList.remove('show');
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('searchBtn').disabled = true;
+
+  const loadingMsgs = [
+    '正在采集财务数据...',
+    '正在标准化处理数据...',
+    '正在计算财务指标...',
+    '正在执行异常检测...',
+    '正在生成分析报告...',
+  ];
+  let msgIdx = 0;
+  const msgInterval = setInterval(() => {
+    msgIdx = (msgIdx + 1) % loadingMsgs.length;
+    document.getElementById('loadingText').textContent = loadingMsgs[msgIdx];
+  }, 2000);
+
+  fetch(API + '/api/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({keyword})
+  })
+  .then(r => {
+    if (!r.ok) return r.json().then(e => { throw new Error(e.detail || '分析失败'); });
+    return r.json();
+  })
+  .then(data => {
+    clearInterval(msgInterval);
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('searchBtn').disabled = false;
+    currentData = data;
+    renderResults(data);
+    document.getElementById('results').classList.add('show');
+    document.getElementById('results').scrollIntoView({behavior: 'smooth'});
+  })
+  .catch(err => {
+    clearInterval(msgInterval);
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('searchBtn').disabled = false;
+    const em = document.getElementById('errorMsg');
+    em.textContent = '分析失败: ' + err.message;
+    em.classList.add('show');
+  });
+}
+
+function renderResults(d) {
+  const r = d.ratios || {};
+  const s = d.summary || {};
+
+  // Score card
+  const score = r.health_score || 'N/A';
+  const scoreLabel = score >= 70 ? '良好' : score >= 50 ? '一般' : '需关注';
+  const bd = r.health_score_breakdown || {};
+  document.getElementById('scoreCard').innerHTML = `
+    <div class="score-circle">
+      <div class="num">${score}</div>
+      <div class="label">/ 100 分</div>
+    </div>
+    <div class="score-info">
+      <h2>${d.stock_name || ''}（${d.stock_code}）综合财务健康度 — ${scoreLabel}</h2>
+      <div class="score-detail">
+        <span>盈利能力 ${bd.profitability || '-'}</span>
+        <span>偿债能力 ${bd.solvency || '-'}</span>
+        <span>营运能力 ${bd.efficiency || '-'}</span>
+        <span>成长能力 ${bd.growth || '-'}</span>
+        <span>现金流 ${bd.cashflow || '-'}</span>
+      </div>
+    </div>
+  `;
+
+  // Info bar
+  document.getElementById('infoBar').innerHTML = `
+    <span class="info-tag">报告期: <b>${d.report_date || '最新'}</b></span>
+    <span class="info-tag">营收: <b>${fmtYi(s.operating_revenue)}亿</b></span>
+    <span class="info-tag">净利润: <b>${fmtYi(s.net_profit)}亿</b></span>
+    <span class="info-tag">总资产: <b>${fmtYi(s.total_assets)}亿</b></span>
+    <span class="info-tag">Z-Score: <b>${d.altman?.z_score || 'N/A'}</b></span>
+  `;
+
+  // Render all tabs
+  renderIndicators(d);
+  renderNotable(d);
+  renderFinancial(d);
+  renderAudit(d);
+  renderCharts(d);
+}
+
+function fmtYi(v) { return v != null ? (v / 1e8).toFixed(2) : 'N/A'; }
+function pct(v) { return v != null ? (v * 100).toFixed(2) + '%' : 'N/A'; }
+function fmt(v) { return v != null ? v.toFixed(2) : 'N/A'; }
+
+function metricClass(name, val) {
+  if (val == null) return '';
+  if (name === 'ROE' && val > 0.15) return 'metric-good';
+  if (name === 'ROE' && val < 0.05) return 'metric-bad';
+  if ((name === '毛利率' || name === 'gross_margin') && val > 0.40) return 'metric-good';
+  if (name === '资产负债率' && val > 0.70) return 'metric-bad';
+  if (name === '流动比率' && val < 1.0) return 'metric-bad';
+  if (name === '经营现金流/净利润' && val < 0) return 'metric-bad';
+  return '';
+}
+
+function renderIndicators(d) {
+  const r = d.ratios || {};
+  const groups = [
+    ['盈利能力', [
+      ['毛利率', r.gross_margin, pct, '>30%为优'],
+      ['净利率', r.net_margin, pct, '>10%为优'],
+      ['ROE', r.roe, pct, '>15%为优'],
+      ['ROA', r.roa, pct, '>5%为优'],
+      ['营业利润率', r.operating_margin, pct, ''],
+      ['核心利润占比', r.core_profit_ratio, pct, '>80%为优'],
+      ['销售费用率', r.selling_expense_ratio, pct, ''],
+      ['研发费用率', r.rd_expense_ratio, pct, ''],
+    ]],
+    ['偿债能力', [
+      ['资产负债率', r.debt_ratio, pct, '40%-60%'],
+      ['权益乘数', r.debt_to_equity, fmt, ''],
+      ['流动比率', r.current_ratio, fmt, '>1.5'],
+      ['速动比率', r.quick_ratio, fmt, '>0.8'],
+      ['有息负债率', r.interest_bearing_debt_ratio, pct, '<30%'],
+    ]],
+    ['营运能力', [
+      ['总资产周转率', r.total_asset_turnover, v => v != null ? v.toFixed(2) + '次' : 'N/A', ''],
+      ['应收账款周转天数', r.ar_turnover_days, v => v != null ? v.toFixed(0) + '天' : 'N/A', ''],
+      ['存货周转天数', r.inventory_turnover_days, v => v != null ? v.toFixed(0) + '天' : 'N/A', ''],
+      ['现金循环周期', r.cash_conversion_cycle, v => v != null ? v.toFixed(0) + '天' : 'N/A', ''],
+    ]],
+    ['成长能力', [
+      ['营收同比增长', r.revenue_growth_yoy, pct, ''],
+      ['净利润同比增长', r.profit_growth_yoy, pct, ''],
+      ['3年营收CAGR', r.revenue_cagr_3y, pct, ''],
+    ]],
+    ['现金流质量', [
+      ['经营现金流/净利润', r.ocf_to_profit, fmt, '>1为优'],
+      ['经营现金流/营收', r.ocf_to_revenue, pct, '>10%为优'],
+      ['自由现金流(亿)', r.free_cashflow, v => v != null ? (v/1e8).toFixed(2) : 'N/A', ''],
+    ]],
+    ['风险指标', [
+      ['商誉/净资产', r.goodwill_to_equity, pct, '<20%'],
+      ['固定资产占比', r.fixed_asset_ratio, pct, ''],
+      ['投资收益/营业利润', r.investment_income_to_profit, pct, ''],
+      ['公允价值变动/营业利润', r.fair_value_to_profit, pct, ''],
+    ]],
+  ];
+
+  let html = '';
+  for (const [gname, items] of groups) {
+    html += `<div class="section"><h3>${gname}</h3><div class="metric-grid">`;
+    for (const [label, val, fn, hint] of items) {
+      const cls = metricClass(label, val);
+      html += `<div class="metric-item">
+        <div class="metric-label">${label}</div>
+        <div class="metric-value ${cls}">${fn(val)}</div>
+        ${hint ? `<div class="metric-hint">${hint}</div>` : ''}
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  // DuPont
+  const dp = d.dupont || {};
+  html += `<div class="section"><h3>杜邦分析（ROE驱动因素分解）</h3>
+    <div class="metric-grid">
+      <div class="metric-item"><div class="metric-label">净利率（盈利能力）</div><div class="metric-value">${pct(dp.net_profit_margin)}</div></div>
+      <div class="metric-item"><div class="metric-label">资产周转率（资产效率）</div><div class="metric-value">${dp.asset_turnover != null ? dp.asset_turnover.toFixed(2) + '次' : 'N/A'}</div></div>
+      <div class="metric-item"><div class="metric-label">权益乘数（财务杠杆）</div><div class="metric-value">${fmt(dp.equity_multiplier)}</div></div>
+      <div class="metric-item" style="border:2px solid var(--primary);background:var(--primary-light);"><div class="metric-label">ROE（股东回报）</div><div class="metric-value" style="color:var(--primary);font-size:22px;">${pct(dp.roe)}</div></div>
+    </div>
+  </div>`;
+
+  document.getElementById('tab-indicators').innerHTML = html;
+}
+
+function renderNotable(d) {
+  const s = d.summary || {};
+  const r = d.ratios || {};
+  const alerts = [];
+
+  // Core financial data
+  let html = `<div class="section"><h3>核心财务数据（亿元）</h3>
+  <table class="data-table">
+    <tr><th>项目</th><th>金额(亿)</th><th>项目</th><th>金额(亿)</th></tr>
+    <tr><td>营业收入</td><td class="num">${fmtYi(s.operating_revenue)}</td><td>营业成本</td><td class="num">${fmtYi(s.operating_cost)}</td></tr>
+    <tr><td>营业利润</td><td class="num">${fmtYi(s.operating_profit)}</td><td>利润总额</td><td class="num">${fmtYi(s.total_profit)}</td></tr>
+    <tr><td>净利润</td><td class="num">${fmtYi(s.net_profit)}</td><td>归母净利润</td><td class="num">${fmtYi(s.net_profit_parent)}</td></tr>
+    <tr><td>总资产</td><td class="num">${fmtYi(s.total_assets)}</td><td>净资产</td><td class="num">${fmtYi(s.total_equity)}</td></tr>
+    <tr><td>总负债</td><td class="num">${fmtYi(s.total_liabilities)}</td><td>资产负债率</td><td class="num">${pct(r.debt_ratio)}</td></tr>
+    <tr><td>经营现金流</td><td class="num">${fmtYi(s.operating_cashflow)}</td><td>自由现金流</td><td class="num">${fmtYi(r.free_cashflow)}</td></tr>
+  </table></div>`;
+
+  // Data anomaly alerts
+  html += `<div class="section"><h3>数据异常提示</h3>`;
+
+  if (r.selling_expense_ratio > 0.30) alerts.push({level:'warning', msg:`销售费用率高达${pct(r.selling_expense_ratio)}，销售驱动的业务模式需关注效率`});
+  if (r.admin_expense_ratio > 0.15) alerts.push({level:'warning', msg:`管理费用率偏高(${pct(r.admin_expense_ratio)})，管理效率有待提升`});
+  if (r.goodwill_to_equity > 0.30) alerts.push({level:'danger', msg:`商誉占净资产${pct(r.goodwill_to_equity)}，远超20%警戒线，减值风险极高`});
+  else if (r.goodwill_to_equity > 0.10) alerts.push({level:'warning', msg:`商誉占净资产${pct(r.goodwill_to_equity)}，需关注减值风险`});
+
+  const ocf = s.operating_cashflow;
+  const np = s.net_profit;
+  if (ocf != null && np != null && np > 0 && ocf < np * 0.3 && ocf >= 0) alerts.push({level:'danger', msg:`经营现金流仅覆盖净利润的${(ocf/np*100).toFixed(1)}%，利润含金量严重不足`});
+  if (ocf != null && np != null && np > 0 && ocf < 0) alerts.push({level:'danger', msg:'净利润为正但经营现金流为负，利润质量存在重大疑问'});
+
+  if (Math.abs(r.investment_income_to_profit || 0) > 0.50) alerts.push({level:'warning', msg:`投资收益占营业利润${pct(Math.abs(r.investment_income_to_profit))}，主营业务盈利能力存疑`});
+  if (Math.abs(r.fair_value_to_profit || 0) > 0.30) alerts.push({level:'warning', msg:`公允价值变动占营业利润${pct(Math.abs(r.fair_value_to_profit))}，利润波动性较大`});
+
+  const aimp = Math.abs(s.asset_impairment_loss || 0);
+  const cimp = Math.abs(s.credit_impairment_loss || 0);
+  if (aimp + cimp > 1e8) alerts.push({level:'info', msg:`当期确认资产减值${(aimp/1e8).toFixed(2)}亿，信用减值${(cimp/1e8).toFixed(2)}亿`});
+
+  if (alerts.length === 0) {
+    html += `<div class="alert alert-success">未发现显著异常数据</div>`;
+  } else {
+    for (const a of alerts) {
+      const cls = {danger:'alert-danger', warning:'alert-warning', info:'alert-info'}[a.level] || 'alert-info';
+      html += `<div class="alert ${cls}">${a.msg}</div>`;
+    }
+  }
+  html += `</div>`;
+
+  // Benford results
+  const bf = d.benford || [];
+  html += `<div class="section"><h3>本福特定律数据质量检验</h3>
+  <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">通过分析大量财务数据首位数字的分布规律来检测是否存在人为篡改。若显著偏离理论分布（p&lt;0.05），可能存在数据异常。</p>
+  <table class="data-table">
+    <tr><th>科目</th><th>样本量</th><th>卡方值</th><th>P值</th><th>MAD</th><th>一致性</th><th>结果</th></tr>`;
+  for (const br of bf) {
+    if (br.error) {
+      html += `<tr><td>${br.label||''}</td><td colspan="6" style="color:#999;">${br.error}</td></tr>`;
+    } else {
+      html += `<tr>
+        <td>${br.label||''}</td><td>${br.sample_size||''}</td><td>${br.chi2_statistic||''}</td>
+        <td>${br.p_value||''}</td><td>${br.mad||''}</td><td>${br.conformity_cn||''}</td>
+        <td>${br.is_abnormal ? '<span class="badge badge-red">异常</span>' : '<span class="badge badge-green">正常</span>'}</td>
+      </tr>`;
+    }
+  }
+  html += `</table></div>`;
+
+  document.getElementById('tab-notable').innerHTML = html;
+}
+
+function renderFinancial(d) {
+  const r = d.ratios || {};
+  let html = `<div class="section"><h3>综合分析</h3>`;
+
+  const texts = [];
+  const roe = r.roe;
+  const gm = r.gross_margin;
+  const nm = r.net_margin;
+  const dr = r.debt_ratio;
+  const ocfRatio = r.ocf_to_profit;
+  const revG = r.revenue_growth_yoy;
+
+  if (roe > 0.15) texts.push(`公司ROE为${pct(roe)}，处于较优水平，反映股东回报能力较强。`);
+  else if (roe > 0.05) texts.push(`公司ROE为${pct(roe)}，处于中等水平，股东回报能力一般。`);
+  else if (roe != null) texts.push(`公司ROE仅${pct(roe)}，低于资本成本，股东价值创造能力不足。`);
+
+  if (gm > 0.40) texts.push(`毛利率${pct(gm)}，产品竞争力较强，具有较好的定价权。`);
+  else if (gm < 0.15 && gm != null) texts.push(`毛利率仅${pct(gm)}，产品或服务附加值较低，成本压力较大。`);
+
+  if (dr > 0.70) texts.push(`资产负债率高达${pct(dr)}，财务杠杆较高，偿债压力值得关注。`);
+  else if (dr < 0.30 && dr != null) texts.push(`资产负债率仅${pct(dr)}，财务杠杆利用不足，可能损失了税盾收益。`);
+
+  if (ocfRatio > 1.0) texts.push(`经营现金流充分覆盖净利润（比率${ocfRatio.toFixed(2)}），利润含金量高，盈利质量优秀。`);
+  else if (ocfRatio < 0 && ocfRatio != null) texts.push(`经营现金流与净利润严重背离（比率${ocfRatio.toFixed(2)}），利润质量存在重大疑问。`);
+
+  if (revG > 0.20) texts.push(`营收同比增长${pct(revG)}，处于快速增长阶段。`);
+  else if (revG < 0 && revG != null) texts.push(`营收同比下滑${pct(revG)}，业务收缩风险需关注。`);
+
+  html += texts.map(t => `<p style="margin:10px 0;text-indent:2em;line-height:1.9;">${t}</p>`).join('');
+  html += `</div>`;
+
+  // Altman
+  const al = d.altman || {};
+  html += `<div class="section"><h3>杜邦分析解读</h3>`;
+  html += texts.length > 0 ? texts.map(t => `<p style="margin:8px 0;text-indent:2em;">${t}</p>`).join('') : '<p>数据不足，无法生成分析</p>';
+  html += `</div>`;
+
+  document.getElementById('tab-financial').innerHTML = html;
+}
+
+function renderAudit(d) {
+  const aud = d.audit || {};
+  const al = d.altman || {};
+
+  let html = '';
+
+  // Altman Z-Score
+  if (al.z_score != null) {
+    const bc = al.risk_color === 'red' ? 'badge-red' : al.risk_color === 'yellow' ? 'badge-yellow' : 'badge-green';
+    html += `<div class="section"><h3>Altman Z-Score 破产风险评估</h3>
+    <p style="font-size:18px;margin-bottom:12px;">
+      Z-Score: <b>${al.z_score}</b> <span class="badge ${bc}">${al.risk_level || ''}</span>
+      <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">${al.version || ''}</span>
+    </p>
+    <table class="data-table">
+      <tr><th>指标</th><th>数值</th><th>说明</th></tr>
+      <tr><td>X1 (营运资金/总资产)</td><td>${al.components?.X1_wc_ratio || '-'}</td><td>流动性指标</td></tr>
+      <tr><td>X2 (留存收益/总资产)</td><td>${al.components?.X2_re_ratio || '-'}</td><td>盈利能力积累</td></tr>
+      <tr><td>X3 (EBIT/总资产)</td><td>${al.components?.X3_ebit_ratio || '-'}</td><td>资产回报率</td></tr>
+      <tr><td>X5 (营收/总资产)</td><td>${al.components?.X5_sales_ratio || '-'}</td><td>资产周转效率</td></tr>
+    </table></div>`;
+  }
+
+  // Audit findings
+  html += `<div class="section"><h3>审计关注事项</h3>`;
+  const findings = aud.findings || [];
+  if (findings.length === 0) {
+    html += `<div class="alert alert-success">未发现重大审计风险信号</div>`;
+  } else {
+    for (const f of findings) {
+      const cls = f.risk_level === 'high' ? 'risk-high' : f.risk_level === 'medium' ? 'risk-medium' : f.risk_level === 'low' ? 'risk-low' : 'risk-info';
+      html += `<div class="finding ${cls}">
+        <div class="f-title">${f.area}</div>
+        <p style="font-size:13px;margin:4px 0;">${f.description}</p>
+        <ul>${(f.details||[]).map(d => `<li>${d}</li>`).join('')}</ul>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+
+  // Summary
+  html += `<div class="section"><h3>会计师视角总结</h3>`;
+  const highRisks = aud.high_risks || 0;
+  const totalRisks = aud.total_risks || 0;
+  if (highRisks > 0) {
+    html += `<div class="alert alert-danger">从审计角度看，本报告期存在 <b>${highRisks}</b> 个高风险领域和 <b>${totalRisks}</b> 个中高风险领域，建议重点关注。</div>`;
+  } else if (totalRisks > 0) {
+    html += `<div class="alert alert-warning">从审计角度看，本报告期存在 <b>${totalRisks}</b> 个需要关注的风险领域。</div>`;
+  } else {
+    html += `<div class="alert alert-success">从审计角度看，未发现重大风险信号。</div>`;
+  }
+  html += `</div>`;
+
+  document.getElementById('tab-audit').innerHTML = html;
+}
+
+function renderCharts(d) {
+  const charts = d.charts || [];
+  let html = '';
+  const names = {'chart_dupont': '杜邦分析', 'chart_radar': '财务健康度雷达图', 'chart_trend': '收入与利润趋势', 'chart_benford': '本福特定律'};
+
+  for (const cp of charts) {
+    const fname = cp.split('/').pop().replace('.png', '');
+    const label = names[fname] || fname;
+    html += `<div class="section"><h3>${label}</h3><img src="${cp}" class="chart-img" alt="${label}" loading="lazy"></div>`;
+  }
+
+  if (html === '') html = '<div class="section"><p style="color:var(--text-secondary);">暂无图表</p></div>';
+  document.getElementById('tab-charts').innerHTML = html;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+  document.getElementById('tab-' + name).style.display = 'block';
+}
+
+// Quick examples
+console.log('A股智能财务分析系统已就绪');
+console.log('示例: 600519 (贵州茅台) | 000858 (五粮液) | 300750 (宁德时代)');
+</script>
+</body>
+</html>
