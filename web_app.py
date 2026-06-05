@@ -92,13 +92,44 @@ async def index():
     return HTMLResponse("<h1>Frontend not found</h1>")
 
 
+def _extract_code(keyword: str) -> str:
+    """从输入中提取股票代码。支持 '600839', '600839 四川长虹', '四川长虹' 等格式"""
+    kw = keyword.strip()
+    # 取第一个空格或中文前的数字部分
+    code_part = kw.split()[0] if kw.split() else kw
+    # 如果第一部分是纯数字且长度为6，直接返回
+    if code_part.isdigit() and len(code_part) <= 6:
+        return code_part.zfill(6)
+    # 否则尝试从开头提取数字
+    digits = ""
+    for ch in kw:
+        if ch.isdigit():
+            digits += ch
+        elif digits:
+            break
+    if digits and len(digits) <= 6:
+        return digits.zfill(6)
+    return ""
+
+
+def _extract_name(keyword: str) -> str:
+    """从输入中提取公司名称部分"""
+    kw = keyword.strip()
+    code = _extract_code(kw)
+    if code and len(kw) > len(code):
+        return kw[len(code):].strip()
+    return kw
+
+
 @app.post("/api/search")
 async def search(req: AnalyzeRequest):
     """搜索股票"""
     keyword = req.keyword.strip()
-    # 如果是纯数字代码，直接返回，不走慢速搜索
-    if keyword.isdigit():
-        return {"stocks": [{"code": keyword.zfill(6), "name": ""}]}
+    code = _extract_code(keyword)
+
+    # 如果能提取出纯数字代码，直接返回
+    if code:
+        return {"stocks": [{"code": code, "name": _extract_name(keyword)}]}
 
     try:
         results = search_stock(keyword)
@@ -120,10 +151,11 @@ async def analyze(req: AnalyzeRequest):
     """执行完整财务分析"""
     keyword = req.keyword.strip()
 
-    # Step 1: Quick stock code resolution (skip slow East Money API)
-    if keyword.isdigit():
-        stock_code = keyword.zfill(6)
-        stock_name = ""  # Will be filled from financial data
+    # Step 1: Quick stock code resolution — 优先从输入中提取数字代码
+    code = _extract_code(keyword)
+    if code:
+        stock_code = code
+        stock_name = ""
     else:
         try:
             results = search_stock(keyword)
